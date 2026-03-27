@@ -21,3 +21,11 @@ dev/
 
 # Results file
 results.tsv
+
+# CMF metadata
+mlmd
+mlmd.db
+.cmf_enabled
+
+# Trained models
+model.pt
