@@ -36,7 +36,7 @@ EVAL_TOKENS = 40 * 524288  # number of tokens for val eval
 # Configuration
 # ---------------------------------------------------------------------------
 
-CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "autoresearch")
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache")
 DATA_DIR = os.path.join(CACHE_DIR, "data")
 TOKENIZER_DIR = os.path.join(CACHE_DIR, "tokenizer")
 BASE_URL = "https://huggingface.co/datasets/karpathy/climbmix-400b-shuffle/resolve/main"
