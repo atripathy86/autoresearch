@@ -31,4 +31,4 @@ mlmd.db
 model.pt
 
 # Cache directory
-.cache
+cache
