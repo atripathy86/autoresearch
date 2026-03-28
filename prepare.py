@@ -36,9 +36,9 @@ EVAL_TOKENS = 40 * 524288  # number of tokens for val eval
 # Configuration
 # ---------------------------------------------------------------------------
 
-CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
-DATA_DIR = os.path.join(CACHE_DIR, "data")
-TOKENIZER_DIR = os.path.join(CACHE_DIR, "tokenizer")
+CACHE_DIR = "cache"
+DATA_DIR = "cache/data"
+TOKENIZER_DIR = "cache/tokenizer"
 BASE_URL = "https://huggingface.co/datasets/karpathy/climbmix-400b-shuffle/resolve/main"
 MAX_SHARD = 6542  # the last datashard is shard_06542.parquet
 VAL_SHARD = MAX_SHARD  # pinned validation shard (shard_06542)
