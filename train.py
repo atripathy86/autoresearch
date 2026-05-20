@@ -17,6 +17,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from cmflib.cmf import Cmf
+
 from kernels import get_kernel
 cap = torch.cuda.get_device_capability()
 # varunneal's FA3 is Hopper only, use kernels-community on non-Hopper GPUs
@@ -513,6 +515,38 @@ x, y, epoch = next(train_loader)  # prefetch first batch
 print(f"Time budget: {TIME_BUDGET}s")
 print(f"Gradient accumulation steps: {grad_accum_steps}")
 
+# ---------------------------------------------------------------------------
+# CMF metadata tracking setup
+# ---------------------------------------------------------------------------
+
+metawriter = Cmf(filepath="mlmd", pipeline_name="autoresearch")
+metawriter.create_context(pipeline_stage="Train")
+metawriter.create_execution(
+    execution_type="Train",
+    custom_properties={
+        "depth": DEPTH,
+        "aspect_ratio": ASPECT_RATIO,
+        "head_dim": HEAD_DIM,
+        "window_pattern": WINDOW_PATTERN,
+        "total_batch_size": TOTAL_BATCH_SIZE,
+        "embedding_lr": EMBEDDING_LR,
+        "unembedding_lr": UNEMBEDDING_LR,
+        "matrix_lr": MATRIX_LR,
+        "scalar_lr": SCALAR_LR,
+        "weight_decay": WEIGHT_DECAY,
+        "adam_beta1": ADAM_BETAS[0],
+        "adam_beta2": ADAM_BETAS[1],
+        "warmup_ratio": WARMUP_RATIO,
+        "warmdown_ratio": WARMDOWN_RATIO,
+        "final_lr_frac": FINAL_LR_FRAC,
+        "time_budget": TIME_BUDGET,
+        "num_params_M": num_params / 1e6,
+        "vocab_size": vocab_size,
+    },
+)
+tokenizer_pkl = os.path.join(os.path.expanduser("~"), ".cache", "autoresearch", "tokenizer", "tokenizer.pkl")
+metawriter.log_dataset(tokenizer_pkl, "input")
+
 # Schedules (all based on progress = training_time / TIME_BUDGET)
 
 def get_lr_multiplier(progress):
@@ -589,6 +623,17 @@ while True:
 
     print(f"\rstep {step:05d} ({pct_done:.1f}%) | loss: {debiased_smooth_loss:.6f} | lrm: {lrm:.2f} | dt: {dt*1000:.0f}ms | tok/sec: {tok_per_sec:,} | mfu: {mfu:.1f}% | epoch: {epoch} | remaining: {remaining:.0f}s    ", end="", flush=True)
 
+    metawriter.log_metric("train_metrics", {
+        "loss": train_loss_f,
+        "smooth_loss": debiased_smooth_loss,
+        "lr_multiplier": lrm,
+        "step_ms": dt * 1000,
+        "tok_per_sec": tok_per_sec,
+        "mfu": mfu,
+        "step": step,
+        "progress": progress,
+    })
+
     # GC management (Python's GC causes ~500ms stalls)
     if step == 0:
         gc.collect()
@@ -604,6 +649,8 @@ while True:
         break
 
 print()  # newline after \r training log
+
+metawriter.commit_metrics("train_metrics")
 
 total_tokens = step * TOTAL_BATCH_SIZE
 
@@ -628,3 +675,15 @@ print(f"total_tokens_M:   {total_tokens / 1e6:.1f}")
 print(f"num_steps:        {step}")
 print(f"num_params_M:     {num_params / 1e6:.1f}")
 print(f"depth:            {DEPTH}")
+
+metawriter.log_execution_metrics("eval_metrics", {
+    "val_bpb": val_bpb,
+    "training_seconds": total_training_time,
+    "total_seconds": t_end - t_start,
+    "peak_vram_mb": peak_vram_mb,
+    "mfu_percent": steady_state_mfu,
+    "total_tokens_M": total_tokens / 1e6,
+    "num_steps": step,
+    "num_params_M": num_params / 1e6,
+})
+metawriter.finalize()

@@ -17,6 +17,8 @@ import argparse
 import pickle
 from multiprocessing import Pool
 
+from cmflib.cmf import Cmf
+
 import requests
 import pyarrow.parquet as pq
 import rustbpe
@@ -379,11 +381,32 @@ if __name__ == "__main__":
     print(f"Cache directory: {CACHE_DIR}")
     print()
 
+    metawriter = Cmf(filepath="mlmd", pipeline_name="autoresearch")
+    metawriter.create_context(pipeline_stage="Prepare")
+    metawriter.create_execution(
+        execution_type="Prepare",
+        custom_properties={
+            "num_shards": num_shards,
+            "download_workers": args.download_workers,
+            "vocab_size": VOCAB_SIZE,
+            "max_seq_len": MAX_SEQ_LEN,
+        },
+    )
+
     # Step 1: Download data
     download_data(num_shards, download_workers=args.download_workers)
     print()
+    metawriter.log_dataset(DATA_DIR, "output",
+        custom_properties={"num_shards": num_shards, "val_shard": VAL_SHARD})
 
     # Step 2: Train tokenizer
     train_tokenizer()
     print()
+    tokenizer_pkl = os.path.join(TOKENIZER_DIR, "tokenizer.pkl")
+    token_bytes_path = os.path.join(TOKENIZER_DIR, "token_bytes.pt")
+    metawriter.log_dataset(tokenizer_pkl, "output",
+        custom_properties={"vocab_size": VOCAB_SIZE})
+    metawriter.log_dataset(token_bytes_path, "output")
+
+    metawriter.finalize()
     print("Done! Ready to train.")
